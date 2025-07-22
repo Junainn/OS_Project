@@ -52,7 +52,7 @@ A simple yet interactive terminal-based task manager written in **Bash**, allowi
    ```bash
    sudo apt update
    sudo apt install dos2unix
-   dos2unix users.txt task_manager.sh
+   dos2unix users.txt CLI_task_manager.sh
    ```
 
 ---
