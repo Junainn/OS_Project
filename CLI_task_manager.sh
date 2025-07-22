@@ -35,6 +35,7 @@ start_busy_process() {
 
 login() {
     for attempt in {1..3}; do
+        echo "Default username: 'system', password: 'system'"
         read -p "Username: " USERNAME
         read -s -p "Password: " PASSWORD
         echo
