@@ -13,7 +13,7 @@ YELLOW="\033[33m"
 CYAN="\033[36m"
 RESET="\033[0m"
 
-
+# --- Helper functions ---
 log_action() {
     TS="$(date '+%Y-%m-%d %H:%M:%S')"
     echo "$TS | User: $USERNAME | $1 | PID: $2 | CMD: $3 | $4" >> "$LOG_FILE"
@@ -32,7 +32,7 @@ start_busy_process() {
     pause
 }
 
-
+# --- Login ---
 login() {
     for attempt in {1..3}; do
         echo "Default username: 'system', password: 'system'"
@@ -51,24 +51,22 @@ login() {
     exit 1
 }
 
-
+# --- Processes Menu ---
 processes_menu() {
     while true; do
         clear
         echo -e "${CYAN}===== Processes =====${RESET}"
-        echo "1. Show Processes"
+        echo "1. Show Processes (Sorted by CPU, Memory, PID, or User)"
         echo "2. Filter Processes"
-        echo "3. Sort Processes"
-        echo "4. Terminate a Process"
-        echo "5. Back to Main Menu"
+        echo "3. Terminate a Process"
+        echo "4. Back to Main Menu"
         echo
-        read -p "Enter your choice [1-5]: " PROC_CHOICE
+        read -p "Enter your choice [1-4]: " PROC_CHOICE
         case "$PROC_CHOICE" in
             1) show_processes ;;
             2) filter_processes ;;
-            3) sort_processes ;;
-            4) terminate_process ;;
-            5) break ;;
+            3) terminate_process ;;
+            4) break ;;
             *) echo -e "${RED}Invalid choice!${RESET}"; pause ;;
         esac
     done
@@ -79,10 +77,21 @@ show_processes() {
     echo "Sort by:"
     echo "1. CPU (most active first)"
     echo "2. Memory (most used first)"
-    read -p "Select sorting [1-2]: " sort_option
-    [[ "$sort_option" == "1" ]] && SORT="-%cpu" || SORT="-%mem"
+    echo "3. PID"
+    echo "4. User"
+    read -p "Select sorting [1-4]: " sort_option
+
+    case "$sort_option" in
+        1) SORT="-%cpu" ;;
+        2) SORT="-%mem" ;;
+        3) SORT="pid" ;;
+        4) SORT="user" ;;
+        *) echo -e "${RED}Invalid option. Defaulting to CPU sort.${RESET}"
+           SORT="-%cpu" ;;
+    esac
 
     echo -e "${YELLOW}PID     USER     %MEM   %CPU   STATE  COMMAND${RESET}"
+
     ps -eo pid,user,%mem,%cpu,state,comm --sort=$SORT | tail -n +2 | head -15 | \
     awk -v red="$RED" -v green="$GREEN" -v yellow="$YELLOW" -v reset="$RESET" '
         $5 != "Z" {
@@ -92,6 +101,7 @@ show_processes() {
             else if ($2 == ENVIRON["USER"]) color=yellow;
             printf "%s%-7s %-8s %-6s %-6s %-6s %s%s\n", color, $1, $2, $3, $4, $5, $6, reset
         }'
+
     echo
     pause
 }
@@ -101,27 +111,6 @@ filter_processes() {
     echo -e "${YELLOW}PID     USER     %MEM   %CPU   STATE  COMMAND${RESET}"
     ps -eo pid,user,%mem,%cpu,state,comm | grep -i --color=never "$pattern" | tail -n +2 | head -15 | \
     awk -v yellow="$YELLOW" -v reset="$RESET" '$5 != "Z" {printf "%s%-7s %-8s %-6s %-6s %-6s %s%s\n", yellow, $1, $2, $3, $4, $5, $6, reset}'
-    echo
-    pause
-}
-
-sort_processes() {
-    echo "Sort by:"
-    echo "1. Memory"
-    echo "2. CPU"
-    echo "3. PID"
-    echo "4. User"
-    read -p "Choose [1-4]: " opt
-    case "$opt" in
-        1) SORT="-%mem" ;;
-        2) SORT="-%cpu" ;;
-        3) SORT="pid" ;;
-        4) SORT="user" ;;
-        *) echo -e "${RED}Invalid.${RESET}"; pause; return ;;
-    esac
-    echo -e "${YELLOW}PID     USER     %MEM   %CPU   STATE  COMMAND${RESET}"
-    ps -eo pid,user,%mem,%cpu,state,comm --sort=$SORT | tail -n +2 | head -15 | \
-    awk -v cyan="$CYAN" -v reset="$RESET" '$5 != "Z" {printf "%s%-7s %-8s %-6s %-6s %-6s %s%s\n", cyan, $1, $2, $3, $4, $5, $6, reset}'
     echo
     pause
 }
@@ -137,6 +126,7 @@ terminate_process() {
             else if ($2 == ENVIRON["USER"]) color=yellow;
             printf "%s%-7s %-8s %-6s %-6s %-6s %s%s\n", color, $1, $2, $3, $4, $5, $6, reset
         }'
+
     echo
     read -p "Enter PID to kill (or 'b' to go back): " PID
     if [[ "$PID" =~ ^[bB]$ ]]; then
@@ -144,26 +134,33 @@ terminate_process() {
         pause
         return
     fi
+
     if [[ ! "$PID" =~ ^[0-9]+$ ]]; then
         echo -e "${RED}Invalid PID.${RESET}"
         SESSION_ERRORS=$((SESSION_ERRORS+1))
         log_action "KILL_FAILED" "$PID" "-" "Invalid PID"
-        pause; return
+        pause
+        return
     fi
+
     PROC_USER=$(ps -p "$PID" -o user=)
     PROC_NAME=$(ps -p "$PID" -o comm=)
     PROC_STATE=$(ps -p "$PID" -o state=)
+
     if [[ -z "$PROC_NAME" || "$PROC_STATE" =~ "Z" ]]; then
         echo -e "${RED}PID not found or is a zombie.${RESET}"
         SESSION_ERRORS=$((SESSION_ERRORS+1))
         log_action "KILL_FAILED" "$PID" "-" "PID not found or zombie"
-        pause; return
+        pause
+        return
     fi
+
     if [[ "$PROC_USER" != "$USERNAME" ]]; then
         echo -e "${RED}Warning:${RESET} ${YELLOW}You are about to kill a process owned by $PROC_USER. This may require 'sudo' and could destabilize your session!${RESET}"
         read -p "Are you sure? [y/N]: " sure
         [[ ! "$sure" =~ ^[Yy]$ ]] && echo "Cancelled." && pause && return
     fi
+
     read -p "Are you sure you want to kill PID $PID ($PROC_NAME)? [y/N]: " CONFIRM
     if [[ "$CONFIRM" =~ ^[Yy]$ ]]; then
         if kill -15 "$PID" 2>/dev/null; then
@@ -178,6 +175,7 @@ terminate_process() {
     else
         echo "Cancelled."
     fi
+
     SESSION_ACTIONS=$((SESSION_ACTIONS+1))
     pause
 }
