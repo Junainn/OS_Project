@@ -86,8 +86,8 @@ chmod +x CLI_task_manager.sh
 
 | Problem                              | Solution |
 |-------------------------------------|----------|
-| `Permission denied`                 | `chmod +x task_manager.sh` |
-| `bad interpreter`                   | `dos2unix task_manager.sh` |
+| `Permission denied`                 | `chmod +x CLI_task_manager.sh` |
+| `bad interpreter`                   | `dos2unix CLI_task_manager.sh` |
 | `Login not working`                 | Clean `users.txt`, remove blank lines |
 | Process kill fails                  | Use `sudo` or kill your own process |
 
